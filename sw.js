@@ -1,5 +1,5 @@
-const CACHE = 'biotech-store-v20';
-const SHELL = ['./', './index.html', './admin-tools.js', './supplier-tools.js', './customer-tools.js', './product-experience.js', './ai-config.js', './manifest.json', './brand-logo.png'];
+const CACHE = 'biotech-store-v21';
+const SHELL = ['./', './index.html', './admin-tools.js', './supplier-tools.js', './customer-tools.js', './product-experience.js', './order-review.js', './flash-offer.js', './ai-config.js', './manifest.json', './brand-logo.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));
