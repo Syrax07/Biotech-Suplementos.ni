@@ -1,5 +1,5 @@
-const CACHE = 'biotech-store-v21';
-const SHELL = ['./', './index.html', './admin-tools.js', './supplier-tools.js', './customer-tools.js', './product-experience.js', './order-review.js', './flash-offer.js', './ai-config.js', './manifest.json', './brand-logo.png'];
+const CACHE = 'biotech-store-v22';
+const SHELL = ['./', './index.html', './admin-tools.js', './supplier-tools.js', './customer-tools.js', './product-experience.js', './order-review.js', './flash-offer.js', './ai-config.js', './cloud-config.js', './cloud-data.js', './manifest.json', './brand-logo.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));
@@ -20,3 +20,4 @@ self.addEventListener('fetch', event => {
     return response;
   }).catch(() => caches.match(event.request).then(response => response || caches.match('./index.html'))));
 });
+
