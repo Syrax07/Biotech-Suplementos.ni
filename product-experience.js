@@ -67,10 +67,13 @@ async function previewProductPhotos(input, productId) {
   if (files.length > 8) { input.value = ''; return toast('Puedes elegir hasta 8 fotos por producto.'); }
   let images = files;
   if (!files.length && productId) {
-    try { images = await getProductGallery(productId); } catch { images = []; }
+    try {
+      const product = products.find(item => item.id === productId);
+      images = product?.gallery?.length ? product.gallery : await getProductGallery(productId);
+    } catch { images = []; }
   }
   images.forEach((image, index) => {
-    const url = image instanceof File ? URL.createObjectURL(image) : photoUrl(productId, index, image);
+    const url = image instanceof File ? URL.createObjectURL(image) : image instanceof Blob ? photoUrl(productId, index, image) : image;
     if (image instanceof File) preview._biotechUrls.push(url);
     const img = document.createElement('img'); img.src = url; img.alt = `Foto ${index + 1} del producto`; preview.appendChild(img);
   });
@@ -86,7 +89,10 @@ function enhanceProductForm(productId) {
     details.append(summary, urlLabel.cloneNode(true)); urlLabel.replaceWith(details);
   }
   const photoField = document.createElement('section'); photoField.className = 'product-photo-field';
-  photoField.innerHTML = `<label>Fotos del producto<input type="file" class="product-photo-input" accept="image/*" multiple></label><small>Elige desde tu computadora o galería del teléfono. Hasta 8 fotos, máximo 8 MB cada una. Se conserva el archivo original.</small><div class="product-photo-preview"></div><p class="fine">Recomendado: imagen cuadrada de al menos 1200 × 1200 px, fondo claro, envase centrado y con 15–20% de margen. La tienda no recorta ni convierte el archivo. La miniatura de la tarjeta puede recortarse solo al mostrarse.</p><button type="button" class="admin-action" onclick="clearProductPhotos('${esc(productId || '')}')">Quitar todas las fotos guardadas</button><p class="fine">Por ahora se guardan en el almacenamiento de este navegador y dispositivo, no en la nube.</p></section>`;
+  const photoStorageNote = window.BioTechCloud?.configured
+    ? 'Las fotos nuevas se guardan en Supabase Storage y estarán disponibles en todos tus dispositivos.'
+    : 'Configura Supabase para sincronizar las fotos; mientras tanto se conservan en este navegador.';
+  photoField.innerHTML = `<label>Fotos del producto<input type="file" class="product-photo-input" accept="image/*" multiple></label><small>Elige desde tu computadora o galería del teléfono. Hasta 8 fotos, máximo 8 MB cada una. Se conserva el archivo original.</small><div class="product-photo-preview"></div><p class="fine">Recomendado: imagen cuadrada de al menos 1200 × 1200 px, fondo claro, envase centrado y con 15–20% de margen. La tienda no recorta ni convierte el archivo. La miniatura de la tarjeta puede recortarse solo al mostrarse.</p><button type="button" class="admin-action" onclick="clearProductPhotos('${esc(productId || '')}')">Quitar todas las fotos guardadas</button><p class="fine">${photoStorageNote}</p></section>`;
   const descriptionLabel = form.querySelector('input[name="description"]')?.closest('label');
   if (descriptionLabel && !form.querySelector('.product-info-fields')) {
     const info = document.createElement('section'); info.className = 'product-info-fields';
@@ -104,13 +110,12 @@ function enhanceProductForm(productId) {
 async function clearProductPhotos(productId) {
   if (!productId) return toast('Guarda el producto primero; después podrás quitar sus fotos.');
   if (!confirm('¿Quitar todas las fotos cargadas de este producto?')) return;
-  try {
-    await removeProductGallery(productId);
-    const form = document.querySelector('.overlay.show .checkout'), image = form?.elements.image;
-    if (image) image.value = '';
-    const preview = form?.querySelector('.product-photo-preview'); if (preview) preview.replaceChildren();
-    toast('Fotos quitadas. Guarda el producto para confirmar.');
-  } catch { toast('No se pudieron quitar las fotos.'); }
+  const form = document.querySelector('.overlay.show .checkout'), image = form?.elements.image;
+  if (!form) return;
+  form.dataset.clearGallery = 'true';
+  if (image) image.value = '';
+  const preview = form.querySelector('.product-photo-preview'); if (preview) preview.replaceChildren();
+  toast('Fotos marcadas para quitar. Guarda el producto para confirmar.');
 }
 
 async function saveProductWithPhotos(event, requestedId) {
@@ -119,13 +124,36 @@ async function saveProductWithPhotos(event, requestedId) {
   if (files.length > 8 || files.some(file => !file.type.startsWith('image/') || file.size > 8 * 1024 * 1024)) return toast('Usa hasta 8 imágenes de máximo 8 MB cada una.');
   const id = requestedId || `p${Date.now()}`;
   try {
+    let cloudGallery = null;
     if (files.length) {
-      await saveProductGallery(id, files);
-      form.elements.image.value = `${photoTokenPrefix}${id}`;
+      if (window.BioTechCloud?.configured) {
+        if (!window.BioTechCloud.isAdmin) throw new Error('Se requiere una sesión administrativa.');
+        cloudGallery = await window.BioTechCloud.uploadProductImages(id, files);
+        form.elements.image.value = cloudGallery.urls[0] || '';
+      } else {
+        await saveProductGallery(id, files);
+        form.elements.image.value = `${photoTokenPrefix}${id}`;
+      }
     }
     saveCatalogProduct(event, id);
+    const product = products.find(item => item.id === id);
+    if (cloudGallery && product) {
+      product.image = cloudGallery.urls[0] || product.image;
+      product.gallery = cloudGallery.urls;
+      product.imagePaths = cloudGallery.paths;
+      save('products');
+    } else if (form.dataset.clearGallery === 'true' && product) {
+      product.image = 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&w=700&q=80';
+      product.gallery = [];
+      product.imagePaths = [];
+      save('products');
+      await removeProductGallery(id).catch(() => {});
+    }
     renderProducts();
-  } catch { toast('No se pudieron guardar las fotos en este dispositivo. Intenta con archivos más pequeños.'); }
+  } catch (error) {
+    console.error('BioTech product image save failed', error);
+    toast('No se pudieron guardar las fotos. Verifica la conexión y el acceso al almacenamiento.');
+  }
 }
 
 async function fillProductPhoto(img, product) {
@@ -155,7 +183,7 @@ async function openProductDetail(productId) {
   modal.innerHTML = `<article class="product-detail"><button class="product-detail-close" onclick="this.closest('.overlay').remove()" aria-label="Cerrar detalles">×</button><div class="product-detail-gallery"><div class="detail-main-image"><img id="detailMainImage" src="${esc(product.image?.startsWith(photoTokenPrefix) ? '' : product.image || '')}" alt="${esc(product.name)}"></div><div id="detailThumbnails" class="detail-thumbnails"></div></div><div class="product-detail-copy"><div class="detail-crumb">Inicio / Tienda / ${esc(product.subcategory || product.category)}</div><div class="category">${esc(product.category)} · ${esc(product.subcategory || product.category)}</div><h2>${esc(product.name)}</h2><div class="detail-rating"><span>${reviews.length ? reviewStars(Math.round(average)) : '☆☆☆☆☆'}</span><small>${reviews.length ? `${average.toFixed(1)} · ${reviews.length} opinión${reviews.length === 1 ? '' : 'es'}` : 'Aún sin opiniones'}</small><button onclick="document.getElementById('productDetailModal')?.remove();openReview('${esc(product.id)}')">Calificar</button></div><div class="detail-price">${money(product.price)} <small>${currency} / unidad</small></div><p class="detail-availability">${esc(stockStatus)}</p>${product.description ? `<p>${esc(product.description)}</p>` : ''}${product.details ? `<section><h3>Detalles</h3><p>${esc(product.details)}</p></section>` : ''}${product.ingredients ? `<section><h3>Ingredientes</h3><p>${esc(product.ingredients)}</p></section>` : ''}${product.usage ? `<section><h3>Modo de uso</h3><p>${esc(product.usage)}</p></section>` : ''}<div class="detail-purchase"><label>Cantidad<input id="detailQty" type="number" min="1" max="${Math.max(1, product.stock + (product.incoming || 0))}" value="1"></label><button class="cta" ${!canOrder ? 'disabled' : ''} onclick="addProductDetailToCart('${esc(product.id)}')">${product.stock > 0 ? 'AÑADIR A LA BOLSA' : product.incoming > 0 ? 'ENCARGAR' : 'AGOTADO'}</button></div><p class="fine">Disponibilidad, fecha de llegada y entrega se confirman al coordinar el pedido.</p></div></article>`;
   document.body.appendChild(modal);
   try {
-    const gallery = product.image?.startsWith(photoTokenPrefix) ? await getProductGallery(productId) : [];
+    const gallery = product.gallery?.length ? product.gallery : product.image?.startsWith(photoTokenPrefix) ? await getProductGallery(productId) : [];
     const photos = gallery.length ? gallery : product.image ? [product.image] : [];
     const main = modal.querySelector('#detailMainImage'), thumbs = modal.querySelector('#detailThumbnails');
     photos.forEach((photo, index) => {
@@ -224,3 +252,4 @@ openAdmin = function () {
   openAdminFromProtectedRoute();
 };
 renderProducts();
+
