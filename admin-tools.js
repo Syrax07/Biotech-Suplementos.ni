@@ -70,6 +70,14 @@ productForm = function (id) {
   modal.className = 'overlay show';
   modal.innerHTML = `<div class="drawer" style="margin:auto;height:auto;max-height:92vh"><div class="drawer-head"><h2>${id ? 'Editar producto' : 'Nuevo producto'}</h2><button class="close" onclick="this.closest('.overlay').remove()">×</button></div><form class="checkout" style="margin-top:15px" onsubmit="saveCatalogProduct(event,'${esc(id || '')}')"><label>Nombre<input name="name" required value="${esc(p.name)}"></label><label>Categoría principal<select name="category">${Object.keys(subcategoryMap).map(x => `<option ${x === p.category ? 'selected' : ''}>${x}</option>`).join('')}</select></label><label>Subcategoría<input name="subcategory" list="productSubcategories" required value="${esc(p.subcategory || '')}"><datalist id="productSubcategories">${options.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label><label>Descripción<input name="description" value="${esc(p.description)}"></label><div class="form-grid"><label>Precio (${currency})<input name="price" type="number" min="0" step="0.01" required value="${p.price}"></label><label>Costo (${currency})<input name="cost" type="number" min="0" step="0.01" required value="${p.cost}"></label><label>Stock disponible<input name="stock" type="number" min="0" step="1" required value="${p.stock}"></label><label>Unidades por llegar<input name="incoming" type="number" min="0" step="1" value="${p.incoming || 0}"></label><label>Fecha estimada<input name="arrivalDate" type="date" value="${esc(p.arrivalDate || '')}"></label><label>Código de barras<input name="barcode" value="${esc(p.barcode || '')}" inputmode="numeric"></label><label>Etiqueta<input name="tag" value="${esc(p.tag || '')}"></label></div><label>Imagen del producto (URL)<input name="image" type="url" value="${esc(p.image || '')}" placeholder="https://…"></label><button class="cta">GUARDAR PRODUCTO</button></form></div>`;
   document.body.appendChild(modal);
+  if (!p.category && p.categorySuggestion) {
+    const category = modal.querySelector('select[name="category"]');
+    if (category) { category.value = p.categorySuggestion; category.closest('label').firstChild.textContent = 'Categoría sugerida · revisar'; }
+  }
+  if (!p.subcategory && p.subcategorySuggestion) {
+    const subcategory = modal.querySelector('input[name="subcategory"]');
+    if (subcategory) { subcategory.value = p.subcategorySuggestion; subcategory.closest('label').firstChild.textContent = 'Subcategoría sugerida · revisar'; }
+  }
 };
 
 saveCatalogProduct = function (event, id) {
@@ -79,7 +87,7 @@ saveCatalogProduct = function (event, id) {
   const p = {
     ...(existing || {}), id: id || `p${Date.now()}`, ...d, price: +d.price, cost: +d.cost, stock: +d.stock,
     incoming: +d.incoming, arrivalDate: d.arrivalDate || '', allowPreorder: existing?.allowPreorder ?? true,
-    image: d.image || 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&w=700&q=80'
+    image: d.image || existing?.image || ''
   };
   const index = products.findIndex(item => item.id === id);
   if (index >= 0) products[index] = p;
@@ -647,4 +655,3 @@ function copyPreparedOrderWhatsApp() {
   else copyOrderMessageFallback(message);
 }
 window.addEventListener('resize', () => { if (document.getElementById('panel-insights')?.classList.contains('active')) drawSalesChart(document.getElementById('reportRange')?.value || 'month'); });
-

@@ -34,6 +34,12 @@ Con una URL pública de Supabase configurada, el sitio deja de escribir las cole
 6. Entra a `/admin/` con el usuario creado en Supabase. La primera vez, pulsa **Respaldo** y luego **Importar datos locales** desde el navegador que tenga los datos reales. La importación inserta únicamente colecciones que todavía no existen en la nube; no reemplaza filas existentes ni borra la copia local. También intenta subir las galerías heredadas de IndexedDB, después de pedir confirmación.
 7. Abre la tienda en otro dispositivo y confirma catálogo, existencias, imágenes, promociones, pedido de prueba y lectura del pedido desde el panel. Elimina el pedido de prueba solo después de verificar su estado; no borres filas directamente como parte de la migración.
 
+## Catálogo PDF e imágenes
+
+El archivo preparado contiene 584 registros con EAN único y campos descriptivos. No contiene precios, costos, márgenes, proveedores ni existencias. No se sustituye ninguna categoría actual: las categorías del archivo son sugerencias derivadas de la descripción, no columnas del PDF. Después de configurar la nube y entrar como administrador, abre **Administrar → Importar catálogo**. La conciliación usa EAN exacto; completa solo campos descriptivos vacíos, omite EAN repetidos y crea los artículos nuevos como borradores sin precio/costo ni stock. Revisa las sugerencias de categoría y el reporte antes de publicar productos.
+
+Las imágenes no se extraen ni se verifican en lote desde el PDF. Para cada producto pendiente, confirma EAN, marca, variante y presentación, carga la foto desde la computadora o el teléfono y marca la verificación solo cuando coincida. Con Supabase configurado, la foto nueva se guarda en `product-images`; la URL de fuente y la auditoría permanecen fuera de la respuesta pública. Las fotos manuales que ya existían no se sustituyen automáticamente.
+
 ## Diferencias locales
 
 Los datos de `localStorage` e IndexedDB pertenecen al navegador en que se crearon; GitHub no los contiene. Si la nube y el navegador ya tienen valores distintos, el panel conserva ambos: descarga un respaldo del navegador y te pide confirmar antes de cargar la copia de la nube en ese dispositivo. La importación local no fusiona ni reemplaza colecciones existentes. Para datos repartidos entre varios navegadores, respalda cada uno antes de decidir manualmente cuál es la copia correcta.
@@ -45,6 +51,5 @@ Fotos antiguas permanecen en IndexedDB hasta una importación autenticada. El re
 La migración de archivos no equivale a una conexión de producción. Este entorno no tiene URL/clave de un proyecto Supabase ni acceso para ejecutarla en una base real. Hasta completar los pasos de activación y probar RLS en tu proyecto, no uses pedidos reales. No se probó el envío de correo de Auth, configuración de dominio autorizado, restauración de copias ni despliegue de GitHub Pages desde este entorno.
 
 La tabla JSONB es una capa de compatibilidad para preservar el formato y reducir el riesgo al migrar el sitio existente. Permite consultas desde el panel y sincronización entre dispositivos, pero no reemplaza una futura normalización de cada colección en tablas relacionales; esa fase debe incluir importación verificada y pruebas antes de retirar esta compatibilidad.
-
 
 
