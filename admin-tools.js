@@ -75,9 +75,10 @@ productForm = function (id) {
 saveCatalogProduct = function (event, id) {
   event.preventDefault();
   const d = Object.fromEntries(new FormData(event.target));
+  const existing = products.find(item => item.id === id);
   const p = {
-    id: id || `p${Date.now()}`, ...d, price: +d.price, cost: +d.cost, stock: +d.stock,
-    incoming: +d.incoming, arrivalDate: d.arrivalDate || '', allowPreorder: true,
+    ...(existing || {}), id: id || `p${Date.now()}`, ...d, price: +d.price, cost: +d.cost, stock: +d.stock,
+    incoming: +d.incoming, arrivalDate: d.arrivalDate || '', allowPreorder: existing?.allowPreorder ?? true,
     image: d.image || 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&w=700&q=80'
   };
   const index = products.findIndex(item => item.id === id);
@@ -646,3 +647,4 @@ function copyPreparedOrderWhatsApp() {
   else copyOrderMessageFallback(message);
 }
 window.addEventListener('resize', () => { if (document.getElementById('panel-insights')?.classList.contains('active')) drawSalesChart(document.getElementById('reportRange')?.value || 'month'); });
+
