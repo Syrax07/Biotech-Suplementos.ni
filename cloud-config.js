@@ -1,8 +1,5 @@
-// Public browser values only. The publishable/anon key is protected by RLS, never by secrecy.
+// Public browser values only. Access is enforced by database RLS policies.
 window.BIOTECH_SUPABASE_CONFIG = {
-  url: '',
-  publishableKey: ''
+  url: 'https://vgakfxvzwzggmzgjwlou.supabase.co',
+  publishableKey: 'sb_publishable_mFwzd2wjKJQKj4tKmQMMEQ_Hg9sKJHc'
 };
-
-
-
